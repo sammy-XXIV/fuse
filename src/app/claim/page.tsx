@@ -1,21 +1,98 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { fetchVault } from "@/lib/contract";
+import { downloadFromWalrus } from "@/lib/walrus";
+import { decryptFiles } from "@/lib/crypto";
 
-type ClaimStep = "lookup" | "verify" | "decrypting" | "done";
+type Step = "loading" | "ready" | "decrypting" | "done" | "error" | "not_found" | "no_key";
+
+interface DecryptedFile {
+  name: string;
+  type: string;
+  dataB64: string;
+}
+
+interface VaultInfo {
+  blobId: string;
+  heirContact: string;
+  conditionLabel: string;
+  state: number;
+}
+
+function downloadFile(file: DecryptedFile) {
+  const bytes = Uint8Array.from(atob(file.dataB64), (c) => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: file.type || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatSize(b64: string) {
+  const bytes = Math.round((b64.length * 3) / 4);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function ClaimPage() {
-  const [step, setStep] = useState<ClaimStep>("lookup");
-  const [method, setMethod] = useState<"gmail" | "sms" | "wallet">("gmail");
-  const [input, setInput] = useState("");
+  const [step, setStep] = useState<Step>("loading");
+  const [vault, setVault] = useState<VaultInfo | null>(null);
+  const [files, setFiles] = useState<DecryptedFile[]>([]);
+  const [error, setError] = useState("");
+  const [keyB64, setKeyB64] = useState("");
 
-  const handleLookup = () => {
-    if (!input) return;
-    setStep("verify");
-  };
+  const load = useCallback(async (vid: string) => {
+    try {
+      const raw = await fetchVault(vid) as Record<string, unknown> | null;
+      if (!raw) { setStep("not_found"); return; }
 
-  const handleVerify = () => {
+      setVault({
+        blobId: raw.blob_id as string,
+        heirContact: raw.heir_contact as string,
+        conditionLabel: raw.condition_label as string,
+        state: Number(raw.state ?? 0),
+      });
+      setStep("ready");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStep("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const vid = params.get("vault") ?? "";
+    const key = window.location.hash.replace("#", "");
+
+    setKeyB64(key);
+
+    if (!vid) { setStep("not_found"); return; }
+    if (!key) { setStep("no_key"); return; }
+
+    load(vid);
+  }, [load]);
+
+  async function handleDecrypt() {
+    if (!vault || !keyB64) return;
     setStep("decrypting");
-    setTimeout(() => setStep("done"), 2500);
+    try {
+      const encrypted = await downloadFromWalrus(vault.blobId);
+      const decrypted = await decryptFiles(encrypted, keyB64);
+      setFiles(decrypted);
+      setStep("done");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStep("error");
+    }
+  }
+
+  const stateLabel = (s: number) => {
+    if (s === 0) return { text: "Vault still active — files not yet released", color: "#22c55e", canClaim: false };
+    if (s === 1) return { text: "Vault dormant — ready to settle", color: "#f59e0b", canClaim: true };
+    return { text: "Vault settled — files ready", color: "var(--walrus)", canClaim: true };
   };
 
   return (
@@ -26,183 +103,125 @@ export default function ClaimPage() {
           Claim your <span style={{ color: "var(--walrus)" }}>files</span>
         </h1>
         <p style={{ color: "var(--muted)" }}>
-          Verify your identity to access files sent to you.
+          Files sent to you via Fuse encrypted delivery.
         </p>
       </div>
 
       <div className="glass-card p-8">
-        {/* Lookup */}
-        {step === "lookup" && (
-          <div>
-            <h2 className="text-lg font-semibold mb-5">Find your vault</h2>
 
-            <div className="toggle-group mb-5">
-              {(["gmail", "sms", "wallet"] as const).map((m) => (
-                <button
-                  key={m}
-                  className={`toggle-tab ${method === m ? "active" : ""}`}
-                  onClick={() => { setMethod(m); setInput(""); }}
-                >
-                  {m === "gmail" && "📧 Gmail"}
-                  {m === "sms" && "📱 SMS"}
-                  {m === "wallet" && "👛 Wallet"}
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-5">
-              <label className="text-sm font-medium mb-2 block" style={{ color: "var(--muted)" }}>
-                {method === "gmail" && "Your Gmail address"}
-                {method === "sms" && "Your phone number"}
-                {method === "wallet" && "Your Sui wallet address"}
-              </label>
-              <input
-                type={method === "gmail" ? "email" : "text"}
-                className="glass-input"
-                placeholder={
-                  method === "gmail" ? "you@gmail.com" :
-                  method === "sms" ? "+1 234 567 8900" :
-                  "0x..."
-                }
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-              />
-            </div>
-
-            <button
-              className="btn-primary w-full"
-              style={{ padding: "14px" }}
-              onClick={handleLookup}
-              disabled={!input}
-            >
-              Look Up My Vault
-            </button>
-
-            <div className="divider" />
-
-            <div
-              className="flex items-start gap-3 p-4 rounded-xl text-sm"
-              style={{ background: "rgba(120,240,212,0.05)", border: "1px solid rgba(120,240,212,0.12)" }}
-            >
-              <span>ℹ️</span>
-              <p style={{ color: "var(--muted)" }}>
-                You don&apos;t need a crypto wallet. Just use the same Gmail or phone number the sender registered for you.
-              </p>
-            </div>
+        {step === "loading" && (
+          <div className="text-center py-10" style={{ color: "var(--muted)" }}>
+            <div className="text-3xl mb-4 animate-spin" style={{ display: "inline-block" }}>⚙️</div>
+            <p>Looking up your vault...</p>
           </div>
         )}
 
-        {/* Verify */}
-        {step === "verify" && (
-          <div>
-            <div
-              className="flex items-center gap-3 p-4 rounded-xl mb-6"
-              style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}
-            >
-              <span className="text-2xl">✅</span>
-              <div>
-                <div className="font-semibold text-green-400">Vault found</div>
-                <div className="text-sm" style={{ color: "var(--muted)" }}>
-                  1 vault is waiting for you
-                </div>
-              </div>
-            </div>
-
-            {/* Vault preview */}
-            <div
-              className="p-5 rounded-xl mb-6"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <div className="text-sm font-medium mb-3 gradient-text-green">Vault Details</div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span style={{ color: "var(--muted)" }}>From</span>
-                  <span className="font-medium">0x1a2b...3c4d</span>
-                </div>
-                <div className="flex justify-between">
-                  <span style={{ color: "var(--muted)" }}>Files</span>
-                  <span className="font-medium">3 encrypted files</span>
-                </div>
-                <div className="flex justify-between">
-                  <span style={{ color: "var(--muted)" }}>Status</span>
-                  <span className="badge-settled">Ready to claim</span>
-                </div>
-                <div className="flex justify-between">
-                  <span style={{ color: "var(--muted)" }}>Settled</span>
-                  <span className="font-medium">June 1, 2026</span>
-                </div>
-              </div>
-            </div>
-
-            <h2 className="text-lg font-semibold mb-3">Verify your identity</h2>
-            <p className="text-sm mb-5" style={{ color: "var(--muted)" }}>
-              {method === "gmail" && "Sign in with Google to prove you own this Gmail address."}
-              {method === "sms" && "We'll send a verification code to confirm your number."}
-              {method === "wallet" && "Connect your wallet to prove ownership."}
+        {step === "not_found" && (
+          <div className="text-center py-10">
+            <div className="text-4xl mb-4">🔍</div>
+            <h2 className="text-lg font-semibold mb-2">No vault found</h2>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              This link doesn&apos;t contain a valid vault ID. Use the exact link from the email or SMS.
             </p>
-
-            <button
-              className="btn-primary w-full mb-3"
-              style={{ padding: "14px" }}
-              onClick={handleVerify}
-            >
-              {method === "gmail" && "🔵 Sign in with Google"}
-              {method === "sms" && "📱 Send Verification Code"}
-              {method === "wallet" && "👛 Connect Wallet"}
-            </button>
-            <button
-              className="btn-ghost w-full"
-              style={{ padding: "12px" }}
-              onClick={() => setStep("lookup")}
-            >
-              ← Back
-            </button>
           </div>
         )}
 
-        {/* Decrypting */}
+        {step === "no_key" && (
+          <div className="text-center py-10">
+            <div className="text-4xl mb-4">🔑</div>
+            <h2 className="text-lg font-semibold mb-2">Missing decryption key</h2>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              The decryption key is missing from this link. Use the exact link from the email or SMS — don&apos;t copy just the URL bar without the full link including the # part.
+            </p>
+          </div>
+        )}
+
+        {step === "ready" && vault && (() => {
+          const { text, color, canClaim } = stateLabel(vault.state);
+          return (
+            <div>
+              <div
+                className="flex items-center gap-3 p-4 rounded-xl mb-6"
+                style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}
+              >
+                <span className="text-2xl">✅</span>
+                <div>
+                  <div className="font-semibold text-green-400">Vault found</div>
+                  <div className="text-sm" style={{ color: "var(--muted)" }}>Your files are waiting</div>
+                </div>
+              </div>
+
+              <div
+                className="p-5 rounded-xl mb-6"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <div className="text-sm font-medium mb-3" style={{ color: "var(--walrus)" }}>Vault Details</div>
+                <div className="space-y-2 text-sm">
+                  {vault.conditionLabel && (
+                    <div className="flex justify-between gap-4">
+                      <span style={{ color: "var(--muted)" }}>Condition</span>
+                      <span className="font-medium text-right">{vault.conditionLabel}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--muted)" }}>Status</span>
+                    <span className="font-medium" style={{ color }}>{text}</span>
+                  </div>
+                </div>
+              </div>
+
+              {canClaim ? (
+                <button
+                  className="btn-primary w-full"
+                  style={{ padding: "14px" }}
+                  onClick={handleDecrypt}
+                >
+                  🔓 Decrypt &amp; Download Files
+                </button>
+              ) : (
+                <div
+                  className="p-4 rounded-xl text-sm text-center"
+                  style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}
+                >
+                  The sender&apos;s condition hasn&apos;t been met yet. Check back when the vault settles.
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {step === "decrypting" && (
           <div className="text-center py-8">
             <div className="text-5xl mb-6 animate-spin" style={{ display: "inline-block" }}>⚙️</div>
             <h2 className="text-xl font-semibold mb-3">Decrypting your files...</h2>
             <div className="space-y-2 text-sm" style={{ color: "var(--muted)" }}>
-              <p>✓ Identity verified on Sui</p>
-              <p>✓ Seal releasing decryption key...</p>
-              <p className="animate-pulse">⟳ Fetching encrypted blobs from Walrus...</p>
+              <p>⟳ Fetching encrypted data from Walrus...</p>
+              <p>⟳ Decrypting with AES-256-GCM...</p>
             </div>
             <div className="mt-6 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
               <div
                 className="h-full rounded-full"
-                style={{
-                  width: "70%",
-                  background: "var(--walrus)",
-                  animation: "progress 2.5s ease-out forwards",
-                }}
+                style={{ width: "80%", background: "var(--walrus)", animation: "progress 2s ease-out forwards" }}
               />
             </div>
-            <style>{`
-              @keyframes progress { from { width: 0% } to { width: 100% } }
-            `}</style>
+            <style>{`@keyframes progress { from { width: 0% } to { width: 100% } }`}</style>
           </div>
         )}
 
-        {/* Done */}
         {step === "done" && (
-          <div className="text-center">
-            <div className="text-5xl mb-5">🔓</div>
-            <h2 className="text-2xl font-bold mb-2 gradient-text">Files Unlocked</h2>
-            <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-              Your files have been decrypted and are ready to download.
-            </p>
+          <div>
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-4">🔓</div>
+              <h2 className="text-2xl font-bold mb-1" style={{ color: "var(--walrus)" }}>Files Unlocked</h2>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>
+                {files.length} file{files.length !== 1 ? "s" : ""} decrypted and ready to download.
+              </p>
+            </div>
 
-            <div className="space-y-3 mb-6 text-left">
-              {[
-                { name: "documents.pdf", size: "124 KB" },
-                { name: "access_keys.txt", size: "2.1 KB" },
-                { name: "instructions.docx", size: "88 KB" },
-              ].map((f) => (
+            <div className="space-y-3 mb-6">
+              {files.map((f, i) => (
                 <div
-                  key={f.name}
+                  key={i}
                   className="flex items-center justify-between px-4 py-3 rounded-xl"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
                 >
@@ -210,7 +229,7 @@ export default function ClaimPage() {
                     <span className="text-xl">📄</span>
                     <div>
                       <div className="text-sm font-medium">{f.name}</div>
-                      <div className="text-xs" style={{ color: "var(--muted)" }}>{f.size}</div>
+                      <div className="text-xs" style={{ color: "var(--muted)" }}>{formatSize(f.dataB64)}</div>
                     </div>
                   </div>
                   <button
@@ -219,7 +238,9 @@ export default function ClaimPage() {
                       background: "rgba(120,240,212,0.10)",
                       border: "1px solid rgba(120,240,212,0.25)",
                       color: "var(--walrus)",
+                      cursor: "pointer",
                     }}
+                    onClick={() => downloadFile(f)}
                   >
                     Download
                   </button>
@@ -227,7 +248,11 @@ export default function ClaimPage() {
               ))}
             </div>
 
-            <button className="btn-primary w-full" style={{ padding: "14px" }}>
+            <button
+              className="btn-primary w-full"
+              style={{ padding: "14px" }}
+              onClick={() => files.forEach(downloadFile)}
+            >
               Download All Files
             </button>
 
@@ -236,11 +261,23 @@ export default function ClaimPage() {
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             >
               <p style={{ color: "var(--muted)" }}>
-                This claim is recorded on Sui. The vault is now settled and these files will be available on Walrus until the storage epoch expires.
+                Files were decrypted entirely in your browser. The decryption key never touched any server.
               </p>
             </div>
           </div>
         )}
+
+        {step === "error" && (
+          <div className="text-center py-10">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
+            <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>{error}</p>
+            <button className="btn-ghost" style={{ padding: "10px 24px" }} onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

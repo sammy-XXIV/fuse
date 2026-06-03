@@ -8,9 +8,9 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export async function POST(req: NextRequest) {
   try {
-    const { heirContact, heirEmail, vaultId, conditionLabel, personalMessage, delivery } = await req.json();
+    const { heirContact, heirEmail, claimUrl: providedClaimUrl, vaultId, conditionLabel, personalMessage, delivery } = await req.json();
 
-    const claimUrl = `${APP_URL}/claim?vault=${vaultId}`;
+    const claimUrl = providedClaimUrl ?? `${APP_URL}/claim?vault=${vaultId}`;
 
     // SMS delivery
     if (delivery === "sms") {

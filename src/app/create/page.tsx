@@ -94,7 +94,7 @@ export default function CreateVault() {
 
     try {
       setStatus("encrypting");
-      const { encrypted } = await encryptFiles(files);
+      const { encrypted, keyB64 } = await encryptFiles(files);
 
       setStatus("uploading");
       const { blobId } = await uploadToWalrus(encrypted, 5);
@@ -122,14 +122,18 @@ export default function CreateVault() {
       const newVaultId = created?.[0]?.reference?.objectId ?? "";
       setVaultId(newVaultId);
 
-      // Send notification email to heir
+      // Build claim URL — key goes in fragment (#) so it never hits any server
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const claimUrl = `${appUrl}/claim?vault=${newVaultId}#${keyB64}`;
+
+      // Send notification email/SMS to recipient
       if ((delivery === "gmail" || delivery === "sms") && heirContact) {
         await fetch("/api/notify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             heirContact,
-            vaultId: newVaultId,
+            claimUrl,
             conditionLabel: condition.human_readable as string,
             personalMessage: message,
             delivery,
