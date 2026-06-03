@@ -11,7 +11,9 @@ EXECUTABLE CONDITION TYPES:
 
 1. PING_TIMEOUT — User receives a periodic ping (email/SMS). If they miss N consecutive pings, files deliver.
    params: { interval_days: number, missed_count: number }
-   Example inputs: "if I don't reply for 60 days", "if I go silent for 3 months", "if you don't hear from me in 2 weeks"
+   interval_days can be fractional — e.g. 0.000347 for 30 seconds, 0.0007 for 1 minute, 0.042 for 1 hour.
+   Accept any time interval the user specifies, no matter how short. Do NOT reject short intervals.
+   Example inputs: "if I don't reply for 60 days", "if I go silent for 3 months", "if I don't check in within 30 seconds"
 
 2. DATE_LOCK — Files deliver on a specific date no matter what. Like a time capsule.
    params: { date: "YYYY-MM-DD" }
@@ -30,9 +32,10 @@ EXECUTABLE CONDITION TYPES:
    params: { condition_a: ConditionObject, condition_b: ConditionObject }
    Example inputs: "if I don't reply for 30 days AND my wife confirms", "after 2027 AND if I miss a ping"
 
-6. NOT_EXECUTABLE — The condition genuinely cannot be enforced. Be honest. Suggest the closest executable alternative.
+6. NOT_EXECUTABLE — The condition genuinely cannot be enforced on-chain at all. Be very conservative about using this.
    params: {}
-   Example inputs: "if I get arrested", "if I die", "if my doctor confirms I'm sick"
+   Example inputs: "if I get arrested", "if my doctor confirms I'm sick"
+   NEVER use NOT_EXECUTABLE for time-based conditions regardless of how short — use PING_TIMEOUT with fractional interval_days instead.
 
 RULES:
 - Always return valid JSON only. No explanation text outside the JSON.

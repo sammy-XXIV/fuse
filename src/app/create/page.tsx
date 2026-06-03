@@ -27,8 +27,8 @@ function conditionToArgs(condition: Record<string, unknown>) {
   };
 
   if (type === "PING_TIMEOUT") {
-    const days = Number(params.intervalDays ?? 30);
-    return { ...base, conditionType: COND.PING, intervalMs: days * 86400000 };
+    const days = Number(params.interval_days ?? params.intervalDays ?? 30);
+    return { ...base, conditionType: COND.PING, intervalMs: Math.round(days * 86400000) };
   }
   if (type === "DATE_LOCK") {
     const ms = Number(params.fireDateMs ?? Date.now() + 86400000 * 30);
@@ -215,7 +215,7 @@ export default function CreateVault() {
 
       <div className="flex justify-between text-xs mb-8" style={{ color: "var(--muted)", maxWidth: 360, margin: "0 auto 32px" }}>
         <span style={{ color: step >= 1 ? "var(--walrus)" : undefined }}>Upload Files</span>
-        <span style={{ color: step >= 2 ? "var(--walrus)" : undefined }}>Set Your Heir</span>
+        <span style={{ color: step >= 2 ? "var(--walrus)" : undefined }}>Set Recipient</span>
         <span style={{ color: step >= 3 ? "var(--walrus)" : undefined }}>Vault Rules</span>
       </div>
 
@@ -277,7 +277,7 @@ export default function CreateVault() {
               disabled={files.length === 0}
               onClick={() => setStep(2)}
             >
-              Continue — Set Your Heir →
+              Continue — Set Recipient →
             </button>
           </div>
         )}
@@ -304,7 +304,7 @@ export default function CreateVault() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block" style={{ color: "var(--muted)" }}>Recipient&apos;s Gmail address</label>
-                  <input type="email" className="glass-input" placeholder="heir@gmail.com" value={heirContact} onChange={(e) => setHeirContact(e.target.value)} />
+                  <input type="email" className="glass-input" placeholder="recipient@gmail.com" value={heirContact} onChange={(e) => setHeirContact(e.target.value)} />
                 </div>
                 <div className="flex items-start gap-3 p-4 rounded-xl text-sm" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.15)` }}>
                   <span>💡</span>
@@ -334,7 +334,7 @@ export default function CreateVault() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block" style={{ color: "var(--muted)" }}>Notification email</label>
-                  <input type="email" className="glass-input" placeholder="heir@email.com" value={heirContact} onChange={(e) => setHeirContact(e.target.value)} />
+                  <input type="email" className="glass-input" placeholder="recipient@email.com" value={heirContact} onChange={(e) => setHeirContact(e.target.value)} />
                 </div>
               </div>
             )}
@@ -346,7 +346,7 @@ export default function CreateVault() {
               </label>
               <textarea
                 className="glass-input"
-                placeholder="Leave a note for your heir — they'll see it when the vault settles..."
+                placeholder="Leave a note for your recipient — they'll see it when the vault settles..."
                 rows={3}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
