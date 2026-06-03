@@ -77,6 +77,38 @@ export async function POST(req: NextRequest) {
     const cleaned = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
     const parsed = JSON.parse(cleaned);
 
+    // If Claude returned NOT_EXECUTABLE for a time-based condition, override it.
+    // Extract any time duration from the original input and force PING_TIMEOUT.
+    if (parsed.type === "NOT_EXECUTABLE") {
+      const input = condition.trim().toLowerCase();
+      const timeMatch =
+        input.match(/(\d+(?:\.\d+)?)\s*second/) ||
+        input.match(/(\d+(?:\.\d+)?)\s*minute/) ||
+        input.match(/(\d+(?:\.\d+)?)\s*hour/) ||
+        input.match(/(\d+(?:\.\d+)?)\s*day/) ||
+        input.match(/(\d+(?:\.\d+)?)\s*week/) ||
+        input.match(/(\d+(?:\.\d+)?)\s*month/);
+
+      if (timeMatch) {
+        const value = parseFloat(timeMatch[1]);
+        const unit = timeMatch[0].includes("second") ? value / 86400
+          : timeMatch[0].includes("minute") ? value / 1440
+          : timeMatch[0].includes("hour")   ? value / 24
+          : timeMatch[0].includes("week")   ? value * 7
+          : timeMatch[0].includes("month")  ? value * 30
+          : value;
+
+        return NextResponse.json({
+          type: "PING_TIMEOUT",
+          params: { interval_days: Math.round(unit * 1e6) / 1e6, missed_count: 1 },
+          human_readable: `Your files will be delivered if you don't check in within ${timeMatch[0].trim()}.`,
+          executable: true,
+          fallback: null,
+          confidence: "high",
+        });
+      }
+    }
+
     return NextResponse.json(parsed);
   } catch (err) {
     console.error("parse-condition error:", err);
