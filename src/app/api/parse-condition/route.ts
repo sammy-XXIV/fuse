@@ -78,30 +78,33 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(cleaned);
 
     // If Claude returned NOT_EXECUTABLE for a time-based condition, override it.
-    // Extract any time duration from the original input and force PING_TIMEOUT.
+    // Search both the user input AND Claude's own output for a time duration.
     if (parsed.type === "NOT_EXECUTABLE") {
-      const input = condition.trim().toLowerCase();
-      const timeMatch =
-        input.match(/(\d+(?:\.\d+)?)\s*second/) ||
-        input.match(/(\d+(?:\.\d+)?)\s*minute/) ||
-        input.match(/(\d+(?:\.\d+)?)\s*hour/) ||
-        input.match(/(\d+(?:\.\d+)?)\s*day/) ||
-        input.match(/(\d+(?:\.\d+)?)\s*week/) ||
-        input.match(/(\d+(?:\.\d+)?)\s*month/);
+      const searchText = [
+        condition,
+        parsed.human_readable ?? "",
+        parsed.fallback ?? "",
+      ].join(" ").toLowerCase();
+
+      const TIME_RE = /(\d+(?:\.\d+)?)\s*[-–]?\s*(second|minute|hour|day|week|month)s?/;
+      const timeMatch = searchText.match(TIME_RE);
 
       if (timeMatch) {
         const value = parseFloat(timeMatch[1]);
-        const unit = timeMatch[0].includes("second") ? value / 86400
-          : timeMatch[0].includes("minute") ? value / 1440
-          : timeMatch[0].includes("hour")   ? value / 24
-          : timeMatch[0].includes("week")   ? value * 7
-          : timeMatch[0].includes("month")  ? value * 30
+        const unitWord = timeMatch[2];
+        const days =
+          unitWord === "second" ? value / 86400
+          : unitWord === "minute" ? value / 1440
+          : unitWord === "hour"   ? value / 24
+          : unitWord === "week"   ? value * 7
+          : unitWord === "month"  ? value * 30
           : value;
 
+        const label = `${timeMatch[1]} ${unitWord}${value !== 1 ? "s" : ""}`;
         return NextResponse.json({
           type: "PING_TIMEOUT",
-          params: { interval_days: Math.round(unit * 1e6) / 1e6, missed_count: 1 },
-          human_readable: `Your files will be delivered if you don't check in within ${timeMatch[0].trim()}.`,
+          params: { interval_days: Math.round(days * 1e6) / 1e6, missed_count: 1 },
+          human_readable: `Your files will be delivered if you don't check in within ${label}.`,
           executable: true,
           fallback: null,
           confidence: "high",
