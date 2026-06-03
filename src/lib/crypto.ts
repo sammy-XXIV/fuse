@@ -1,12 +1,21 @@
 // Client-side AES-256-GCM encryption — files never leave the browser unencrypted
 
+function uint8ToB64(bytes: Uint8Array): string {
+  let bin = "";
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
 export async function generateKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
 }
 
 export async function exportKey(key: CryptoKey): Promise<string> {
   const raw = await crypto.subtle.exportKey("raw", key);
-  return btoa(String.fromCharCode(...new Uint8Array(raw)));
+  return uint8ToB64(new Uint8Array(raw));
 }
 
 export async function importKey(b64: string): Promise<CryptoKey> {
@@ -23,7 +32,7 @@ export async function encryptFiles(files: File[]): Promise<{
 
   for (const file of files) {
     const buf = await file.arrayBuffer();
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const b64 = uint8ToB64(new Uint8Array(buf));
     bundle.push({ name: file.name, type: file.type, dataB64: b64 });
   }
 
