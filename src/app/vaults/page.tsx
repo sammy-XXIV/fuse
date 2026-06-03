@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { fetchVaultsByOwner, buildCheckInTx, COND } from "@/lib/contract";
 import ScrollReveal from "@/components/ScrollReveal";
+import { registerSW, requestNotificationPermission, checkVaultNotifications } from "@/lib/notifications";
 
 type VaultStatus = "alive" | "dormant" | "settled_revealed" | "settled_burned";
 
@@ -129,13 +130,23 @@ export default function MyVaults() {
   const [vaults, setVaults] = useState<VaultUI[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
+  const [notifPermission, setNotifPermission] = useState<"default" | "granted" | "denied">("default");
 
   const loadVaults = useCallback(async () => {
     if (!account?.address) return;
     setLoading(true);
     try {
       const raw = await fetchVaultsByOwner(account.address);
-      setVaults(raw.map((r) => mapRawVault(r as Record<string, unknown>)));
+      const mapped = raw.map((r) => mapRawVault(r as Record<string, unknown>));
+      setVaults(mapped);
+      // Fire notification checks after loading
+      checkVaultNotifications(mapped.map((v) => ({
+        id: v.id,
+        label: v.conditionLabel || v.label,
+        status: v.status,
+        deadlineMs: v.deadlineMs,
+        intervalMs: v.intervalMs,
+      })));
     } catch (e) {
       console.error("Failed to load vaults", e);
     } finally {
@@ -143,7 +154,27 @@ export default function MyVaults() {
     }
   }, [account?.address]);
 
+  // Register service worker + check existing permission
+  useEffect(() => {
+    registerSW();
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotifPermission(Notification.permission as "default" | "granted" | "denied");
+    }
+  }, []);
+
   useEffect(() => { loadVaults(); }, [loadVaults]);
+
+  async function handleEnableNotifications() {
+    const granted = await requestNotificationPermission();
+    setNotifPermission(granted ? "granted" : "denied");
+    if (granted) checkVaultNotifications(vaults.map((v) => ({
+      id: v.id,
+      label: v.conditionLabel || v.label,
+      status: v.status,
+      deadlineMs: v.deadlineMs,
+      intervalMs: v.intervalMs,
+    })));
+  }
 
   async function handleCheckIn(vaultId: string) {
     setCheckingIn(vaultId);
@@ -168,6 +199,39 @@ export default function MyVaults() {
         <h1 className="text-4xl font-bold mb-2">My <span style={{ color: "var(--walrus)" }}>Vaults</span></h1>
         <p style={{ color: "var(--muted)" }}>Check in to hold delivery.</p>
       </div>
+
+      {/* Notification permission banner */}
+      {notifPermission === "default" && (
+        <div
+          className="flex items-center justify-between gap-4 p-4 rounded-2xl mb-6"
+          style={{ background: "rgba(120,240,212,0.06)", border: "1px solid rgba(120,240,212,0.18)" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🔔</span>
+            <div>
+              <div className="text-sm font-semibold">Get deadline reminders</div>
+              <div className="text-xs" style={{ color: "var(--muted)" }}>We&apos;ll notify you before any vault settles — no spam, just timely alerts.</div>
+            </div>
+          </div>
+          <button
+            className="btn-primary shrink-0"
+            style={{ padding: "8px 18px", fontSize: "13px" }}
+            onClick={handleEnableNotifications}
+          >
+            Enable
+          </button>
+        </div>
+      )}
+
+      {notifPermission === "granted" && (
+        <div
+          className="flex items-center gap-3 p-3 rounded-2xl mb-6 text-sm"
+          style={{ background: "rgba(120,240,212,0.04)", border: "1px solid rgba(120,240,212,0.10)" }}
+        >
+          <span>✅</span>
+          <span style={{ color: "var(--muted)" }}>Notifications on — you&apos;ll be reminded at 50%, 80%, and 95% of each vault&apos;s countdown.</span>
+        </div>
+      )}
 
       {/* Summary bar */}
       <div
