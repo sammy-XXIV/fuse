@@ -1,18 +1,11 @@
-import nodemailer from "nodemailer";
 import twilio from "twilio/lib/rest/Twilio";
 import { NextRequest, NextResponse } from "next/server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER!,
-    pass: process.env.GMAIL_APP_PASSWORD!,
-  },
-});
+const MJ_AUTH = Buffer.from(
+  `${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`
+).toString("base64");
 
 const twilioClient = new twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -20,11 +13,19 @@ const twilioClient = new twilio(
 );
 
 async function sendEmail(to: string, claimUrl: string, personalMessage?: string) {
-  await transporter.sendMail({
-    from: `"Fuse" <${process.env.GMAIL_USER}>`,
-    to,
-    subject: "Someone secured files for you — Fuse",
-    html: `
+  const res = await fetch("https://api.mailjet.com/v3.1/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${MJ_AUTH}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      Messages: [
+        {
+          From: { Email: "samsonsamuel531@gmail.com", Name: "Fuse" },
+          To: [{ Email: to }],
+          Subject: "Someone secured files for you — Fuse",
+          HTMLContent: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
@@ -33,8 +34,6 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
     <tr>
       <td align="center" style="padding:48px 24px;">
         <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
-
-          <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
               <table cellpadding="0" cellspacing="0">
@@ -45,8 +44,6 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
               </table>
             </td>
           </tr>
-
-          <!-- Card -->
           <tr>
             <td style="background:#0D1829;border:1px solid #1E3A4A;border-radius:20px;padding:40px;">
               <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#78F0D4;text-transform:uppercase;letter-spacing:0.10em;">Encrypted Vault</p>
@@ -54,7 +51,6 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
               <p style="margin:0 0 28px;font-size:15px;color:#7A8BAD;line-height:1.7;">
                 Someone you trust has used Fuse to lock encrypted files in a vault with you as the recipient. When the delivery condition is met, use the link below to claim them — no crypto wallet needed.
               </p>
-
               ${personalMessage ? `
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>
@@ -63,9 +59,7 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
                     <p style="margin:0;font-size:15px;color:#F8FAFF;line-height:1.7;font-style:italic;">&ldquo;${personalMessage}&rdquo;</p>
                   </td>
                 </tr>
-              </table>
-              ` : ""}
-
+              </table>` : ""}
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding:4px 0 28px;">
@@ -75,13 +69,10 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
                   </td>
                 </tr>
               </table>
-
               <p style="margin:0 0 6px;font-size:12px;color:#4A5B7A;">Or copy this link into your browser:</p>
               <p style="margin:0;font-size:12px;color:#78F0D4;word-break:break-all;line-height:1.6;">${claimUrl}</p>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td align="center" style="padding-top:24px;">
               <p style="margin:0;font-size:12px;color:#3A4B6A;line-height:1.8;">
@@ -90,14 +81,21 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
               </p>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
   </table>
 </body>
 </html>`,
+        },
+      ],
+    }),
   });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Mailjet error: ${err}`);
+  }
 }
 
 async function sendSms(to: string, claimUrl: string, personalMessage?: string) {
@@ -130,6 +128,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Notify error", e);
-    return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
