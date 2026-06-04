@@ -1,52 +1,17 @@
-import { Resend } from "resend";
-import twilio from "twilio/lib/rest/Twilio";
 import { NextRequest, NextResponse } from "next/server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BREVO_API_KEY = process.env.BREVO_API_KEY!;
 
-export async function POST(req: NextRequest) {
-  try {
-    const { heirContact, heirEmail, claimUrl: providedClaimUrl, vaultId, conditionLabel, personalMessage, delivery } = await req.json();
-
-    const claimUrl = providedClaimUrl ?? `${APP_URL}/claim?vault=${vaultId}`;
-
-    // SMS delivery
-    if (delivery === "sms") {
-      const phone = heirContact;
-      if (!phone) return NextResponse.json({ error: "No phone number" }, { status: 400 });
-
-      const smsBody = personalMessage
-        ? `⚡ Fuse: "${personalMessage}"\n\nClaim your files: ${claimUrl}`
-        : `⚡ Fuse: Files have been left for you. Claim them here: ${claimUrl}`;
-
-      await twilioClient.messages.create({
-        from: process.env.TWILIO_PHONE!,
-        to: phone,
-        body: smsBody,
-      });
-
-      return NextResponse.json({ ok: true });
-    }
-
-    // Email delivery
-    const email = heirEmail || heirContact;
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "No valid email" }, { status: 400 });
-    }
-
-    await resend.emails.send({
-      from: "Fuse <onboarding@resend.dev>",
-      to: email,
-      subject: "Someone secured files for you — Fuse",
-      html: `
+async function sendEmail(to: string, claimUrl: string, personalMessage?: string) {
+  const body = {
+    sender: { name: "Fuse", email: "noreply@getbrevo.com" },
+    to: [{ email: to }],
+    subject: "Someone secured files for you — Fuse",
+    htmlContent: `
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-</head>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
 <body style="margin:0;padding:0;background:#070D1B;font-family:Inter,system-ui,sans-serif;color:#F8FAFF;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#070D1B;">
     <tr>
@@ -68,13 +33,10 @@ export async function POST(req: NextRequest) {
           <!-- Card -->
           <tr>
             <td style="background:#0D1829;border:1px solid #1E3A4A;border-radius:20px;padding:40px;">
-
               <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#78F0D4;text-transform:uppercase;letter-spacing:0.10em;">Encrypted Vault</p>
-              <h1 style="margin:0 0 16px;font-size:28px;font-weight:800;color:#F8FAFF;line-height:1.2;">
-                Files have been secured for you.
-              </h1>
+              <h1 style="margin:0 0 16px;font-size:28px;font-weight:800;color:#F8FAFF;line-height:1.2;">Files have been secured for you.</h1>
               <p style="margin:0 0 28px;font-size:15px;color:#7A8BAD;line-height:1.7;">
-                Someone you trust has used Fuse to lock encrypted files in a vault with you as the recipient. When the delivery condition is met, you can use the link below to claim them instantly — no crypto wallet needed.
+                Someone you trust has used Fuse to lock encrypted files in a vault with you as the recipient. When the delivery condition is met, use the link below to claim them — no crypto wallet needed.
               </p>
 
               ${personalMessage ? `
@@ -88,7 +50,6 @@ export async function POST(req: NextRequest) {
               </table>
               ` : ""}
 
-              <!-- CTA Button -->
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding:4px 0 28px;">
@@ -101,7 +62,6 @@ export async function POST(req: NextRequest) {
 
               <p style="margin:0 0 6px;font-size:12px;color:#4A5B7A;">Or copy this link into your browser:</p>
               <p style="margin:0;font-size:12px;color:#78F0D4;word-break:break-all;line-height:1.6;">${claimUrl}</p>
-
             </td>
           </tr>
 
@@ -120,10 +80,64 @@ export async function POST(req: NextRequest) {
     </tr>
   </table>
 </body>
-</html>
-      `,
-    });
+</html>`,
+  };
 
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo email error: ${err}`);
+  }
+}
+
+async function sendSms(to: string, claimUrl: string, personalMessage?: string) {
+  const content = personalMessage
+    ? `⚡ Fuse: "${personalMessage}"\n\nYour files: ${claimUrl}`
+    : `⚡ Fuse: Files have been secured for you. Access them here: ${claimUrl}`;
+
+  const res = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender: "Fuse",
+      recipient: to,
+      content,
+      type: "transactional",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo SMS error: ${err}`);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { heirContact, heirEmail, claimUrl: providedClaimUrl, vaultId, personalMessage, delivery } = await req.json();
+
+    const claimUrl = providedClaimUrl ?? `${APP_URL}/claim?vault=${vaultId}`;
+
+    if (delivery === "sms") {
+      if (!heirContact) return NextResponse.json({ error: "No phone number" }, { status: 400 });
+      await sendSms(heirContact, claimUrl, personalMessage);
+      return NextResponse.json({ ok: true });
+    }
+
+    const email = heirEmail || heirContact;
+    if (!email?.includes("@")) return NextResponse.json({ error: "No valid email" }, { status: 400 });
+    await sendEmail(email, claimUrl, personalMessage);
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Notify error", e);
