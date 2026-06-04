@@ -123,8 +123,7 @@ export default function CreateVault() {
       setVaultId(newVaultId);
 
       // Build claim URL — key goes in fragment (#) so it never hits any server
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      const claimUrl = `${appUrl}/claim?vault=${newVaultId}#${keyB64}`;
+      const claimUrl = `${window.location.origin}/claim?vault=${newVaultId}#${keyB64}`;
 
       // Send notification email/SMS to recipient
       if ((delivery === "gmail" || delivery === "sms") && heirContact) {
