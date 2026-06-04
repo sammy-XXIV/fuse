@@ -114,11 +114,9 @@ export default function CreateVault() {
       }
 
       const condArgs = conditionToArgs(condition, guardianAddresses, threshold);
-      const firstRecipient = validRecipients[0] ?? "";
-
       const tx = buildCreateVaultTx({
         blobId,
-        heir: ZERO_ADDR,
+        heir: account.address, // contract needs valid address; actual delivery is via email
         deliveryMethod: "gmail",
         heirContact: validRecipients.join(","),
         conditionLabel: condition.human_readable as string,
