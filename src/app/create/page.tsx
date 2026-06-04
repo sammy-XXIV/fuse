@@ -12,7 +12,7 @@ type VaultRule = "reveal" | "burn";
 const W = "rgba(120,240,212,";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
-function conditionToArgs(condition: Record<string, unknown>) {
+function conditionToArgs(condition: Record<string, unknown>, guardianAddrs: string[] = [], guardianThresh = 1) {
   const type = condition.type as string;
   const params = (condition.params ?? {}) as Record<string, unknown>;
 
@@ -38,8 +38,8 @@ function conditionToArgs(condition: Record<string, unknown>) {
     return {
       ...base,
       conditionType: COND.GUARDIAN,
-      guardians: (params.guardians as string[]) ?? [],
-      guardianThreshold: Number(params.threshold ?? 1),
+      guardians: guardianAddrs,
+      guardianThreshold: guardianThresh,
     };
   }
   if (type === "WALLET_TRIGGER") {
@@ -65,6 +65,8 @@ export default function CreateVault() {
   const [heirWallet, setHeirWallet] = useState("");
   const [message, setMessage] = useState("");
   const [condition, setCondition] = useState<Record<string, unknown> | null>(null);
+  const [guardians, setGuardians] = useState<string[]>([""]);
+  const [guardianThreshold, setGuardianThreshold] = useState(1);
 
   const [status, setStatus] = useState<"idle" | "encrypting" | "uploading" | "signing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -99,7 +101,7 @@ export default function CreateVault() {
       setStatus("uploading");
       const { blobId } = await uploadToWalrus(encrypted, 5);
 
-      const condArgs = conditionToArgs(condition);
+      const condArgs = conditionToArgs(condition, guardians.filter(g => g.trim()), guardianThreshold);
       const heirAddress = delivery === "wallet" ? heirWallet : ZERO_ADDR;
       const contact = heirContact || heirWallet;
 
@@ -158,11 +160,29 @@ export default function CreateVault() {
           </p>
           {vaultId && (
             <div
-              className="p-4 rounded-xl mb-8 text-left"
+              className="p-4 rounded-xl mb-4 text-left"
               style={{ background: "rgba(120,240,212,0.06)", border: "1px solid rgba(120,240,212,0.2)" }}
             >
               <div className="text-xs font-semibold mb-1" style={{ color: "var(--walrus)" }}>Vault ID</div>
               <div className="text-xs font-mono break-all" style={{ color: "var(--muted)" }}>{vaultId}</div>
+            </div>
+          )}
+          {vaultId && condition?.type === "GUARDIAN_CONFIRM" && (
+            <div
+              className="p-4 rounded-xl mb-8 text-left"
+              style={{ background: "rgba(120,240,212,0.06)", border: "1px solid rgba(120,240,212,0.2)" }}
+            >
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--walrus)" }}>👥 Share with your guardians</div>
+              <div className="text-xs mb-2" style={{ color: "var(--muted)" }}>Send this link to each guardian — they connect their wallet and confirm when needed.</div>
+              <div
+                className="text-xs font-mono break-all p-2 rounded-lg"
+                style={{ background: "rgba(0,0,0,0.2)", color: "var(--walrus)" }}
+              >{`${window.location.origin}/confirm?vault=${vaultId}`}</div>
+              <button
+                className="mt-3 text-xs px-3 py-1.5 rounded-lg"
+                style={{ background: "rgba(120,240,212,0.12)", color: "var(--walrus)", border: "1px solid rgba(120,240,212,0.2)" }}
+                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/confirm?vault=${vaultId}`)}
+              >Copy link</button>
             </div>
           )}
           <div className="flex gap-4 justify-center">
@@ -170,7 +190,7 @@ export default function CreateVault() {
               <button className="btn-primary" style={{ padding: "12px 28px" }}>View My Vaults</button>
             </a>
             <button className="btn-ghost" style={{ padding: "12px 28px" }} onClick={() => {
-              setStatus("idle"); setStep(1); setFiles([]); setCondition(null); setHeirContact(""); setHeirWallet("");
+              setStatus("idle"); setStep(1); setFiles([]); setCondition(null); setHeirContact(""); setHeirWallet(""); setGuardians([""]); setGuardianThreshold(1);
             }}>
               Create Another
             </button>
@@ -390,6 +410,62 @@ export default function CreateVault() {
                     Change
                   </button>
                 </div>
+
+                {/* Guardian setup — only shown for GUARDIAN_CONFIRM */}
+                {condition.type === "GUARDIAN_CONFIRM" && (
+                  <div
+                    className="p-5 rounded-xl mb-6"
+                    style={{ background: "rgba(120,240,212,0.04)", border: "1px solid rgba(120,240,212,0.15)" }}
+                  >
+                    <div className="text-sm font-semibold mb-1" style={{ color: "var(--walrus)" }}>👥 Guardian Wallets</div>
+                    <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
+                      Enter the Sui wallet addresses of your guardians. They must all confirm before files are released.
+                    </p>
+                    <div className="space-y-2 mb-3">
+                      {guardians.map((g, i) => (
+                        <div key={i} className="flex gap-2">
+                          <input
+                            type="text"
+                            className="glass-input flex-1"
+                            placeholder={`Guardian ${i + 1} wallet (0x...)`}
+                            value={g}
+                            onChange={(e) => {
+                              const updated = [...guardians];
+                              updated[i] = e.target.value;
+                              setGuardians(updated);
+                            }}
+                            style={{ fontSize: "12px" }}
+                          />
+                          {guardians.length > 1 && (
+                            <button
+                              onClick={() => setGuardians(guardians.filter((_, idx) => idx !== i))}
+                              className="text-sm opacity-40 hover:opacity-100 px-2"
+                            >✕</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setGuardians([...guardians, ""])}
+                      className="text-xs px-3 py-1.5 rounded-lg mb-4"
+                      style={{ background: "rgba(120,240,212,0.08)", color: "var(--walrus)", border: "1px solid rgba(120,240,212,0.15)" }}
+                    >+ Add guardian</button>
+
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs font-medium" style={{ color: "var(--muted)" }}>Required to confirm:</label>
+                      <select
+                        className="glass-input"
+                        style={{ width: "auto", padding: "6px 12px", fontSize: "13px" }}
+                        value={guardianThreshold}
+                        onChange={(e) => setGuardianThreshold(Number(e.target.value))}
+                      >
+                        {guardians.map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} of {guardians.length}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mb-6">
                   <label className="text-sm font-medium mb-4 block">When it fires...</label>
