@@ -281,7 +281,7 @@ export default function CreateVault() {
           </div>
         )}
 
-        {/* Step 2: Heir */}
+        {/* Step 2: Recipient */}
         {step === 2 && (
           <div>
             <h2 className="text-xl font-semibold mb-2">Who receives your files?</h2>

@@ -72,7 +72,7 @@ export default function Home() {
           </div>
 
           <p className="text-xs" style={{ color: "var(--muted)" }}>
-            Heir receiving files?{" "}
+            Recipient receiving files?{" "}
             <Link href="/claim" style={{ color: "var(--walrus)" }}>
               Claim here
             </Link>
