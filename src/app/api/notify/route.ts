@@ -1,14 +1,30 @@
+import nodemailer from "nodemailer";
+import twilio from "twilio/lib/rest/Twilio";
 import { NextRequest, NextResponse } from "next/server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const BREVO_API_KEY = process.env.BREVO_API_KEY!;
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.GMAIL_USER!,
+    pass: process.env.GMAIL_APP_PASSWORD!,
+  },
+});
+
+const twilioClient = new twilio(
+  process.env.TWILIO_ACCOUNT_SID!,
+  process.env.TWILIO_AUTH_TOKEN!
+);
 
 async function sendEmail(to: string, claimUrl: string, personalMessage?: string) {
-  const body = {
-    sender: { name: "Fuse", email: "noreply@getbrevo.com" },
-    to: [{ email: to }],
+  await transporter.sendMail({
+    from: `"Fuse" <${process.env.GMAIL_USER}>`,
+    to,
     subject: "Someone secured files for you — Fuse",
-    htmlContent: `
+    html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
@@ -81,46 +97,19 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
   </table>
 </body>
 </html>`,
-  };
-
-  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": BREVO_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
   });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Brevo email error: ${err}`);
-  }
 }
 
 async function sendSms(to: string, claimUrl: string, personalMessage?: string) {
-  const content = personalMessage
+  const body = personalMessage
     ? `⚡ Fuse: "${personalMessage}"\n\nYour files: ${claimUrl}`
     : `⚡ Fuse: Files have been secured for you. Access them here: ${claimUrl}`;
 
-  const res = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
-    method: "POST",
-    headers: {
-      "api-key": BREVO_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      sender: "Fuse",
-      recipient: to,
-      content,
-      type: "transactional",
-    }),
+  await twilioClient.messages.create({
+    from: process.env.TWILIO_PHONE!,
+    to,
+    body,
   });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Brevo SMS error: ${err}`);
-  }
 }
 
 export async function POST(req: NextRequest) {
