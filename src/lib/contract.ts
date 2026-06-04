@@ -112,9 +112,9 @@ export async function fetchVaultsByOwner(owner: string) {
     (e) => (e.parsedJson as { owner: string })?.owner === owner
   );
 
-  const vaultIds = ownerVaults.map(
-    (e) => (e.parsedJson as { vault_id: string })?.vault_id
-  );
+  const vaultIds = ownerVaults
+    .map((e) => (e.parsedJson as { vault_id: string })?.vault_id)
+    .filter((id): id is string => Boolean(id));
 
   const objects = await Promise.all(
     vaultIds.map((id) =>
@@ -125,8 +125,8 @@ export async function fetchVaultsByOwner(owner: string) {
   return objects
     .filter((o) => o.data?.content?.dataType === "moveObject")
     .map((o) => ({
-      id: o.data!.objectId,
       ...(o.data!.content as { fields: Record<string, unknown> }).fields,
+      id: o.data!.objectId, // must come after spread — Move UID field also named "id" would clobber this
     }));
 }
 
@@ -137,7 +137,7 @@ export async function fetchVault(vaultId: string) {
   });
   if (obj.data?.content?.dataType !== "moveObject") return null;
   return {
-    id: obj.data.objectId,
     ...(obj.data.content as { fields: Record<string, unknown> }).fields,
+    id: obj.data.objectId,
   };
 }
