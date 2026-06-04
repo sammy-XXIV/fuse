@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { fetchVaultsByOwner, buildCheckInTx, COND } from "@/lib/contract";
+import { fetchVaultsByOwner, buildCheckInTx, buildSettleTx, COND } from "@/lib/contract";
 import ScrollReveal from "@/components/ScrollReveal";
 import { registerSW, requestNotificationPermission, checkVaultNotifications } from "@/lib/notifications";
 
@@ -132,6 +132,7 @@ export default function MyVaults() {
   const [vaults, setVaults] = useState<VaultUI[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
+  const [settling, setSettling] = useState<string | null>(null);
   const [notifPermission, setNotifPermission] = useState<"default" | "granted" | "denied">("default");
 
   const loadVaults = useCallback(async () => {
@@ -188,6 +189,19 @@ export default function MyVaults() {
       console.error("Check-in failed", e);
     } finally {
       setCheckingIn(null);
+    }
+  }
+
+  async function handleSettle(vaultId: string) {
+    setSettling(vaultId);
+    try {
+      const tx = buildSettleTx(vaultId);
+      await signAndExecute({ transaction: tx });
+      await loadVaults();
+    } catch (e) {
+      console.error("Settle failed", e);
+    } finally {
+      setSettling(null);
     }
   }
 
@@ -320,12 +334,24 @@ export default function MyVaults() {
                 </button>
               )}
               {vault.status === "dormant" && (
-                <button
-                  className="btn-primary flex-1"
-                  style={{ padding: "12px", background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
-                >
-                  ⚠️ Vault is Dormant — Revive
-                </button>
+                <>
+                  <button
+                    className="btn-primary flex-1"
+                    style={{ padding: "12px", background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
+                    disabled={checkingIn === vault.id}
+                    onClick={() => handleCheckIn(vault.id)}
+                  >
+                    {checkingIn === vault.id ? "Reviving..." : "⚡ Revive"}
+                  </button>
+                  <button
+                    className="btn-primary flex-1"
+                    style={{ padding: "12px" }}
+                    disabled={settling === vault.id}
+                    onClick={() => handleSettle(vault.id)}
+                  >
+                    {settling === vault.id ? "Settling..." : "📬 Settle Now"}
+                  </button>
+                </>
               )}
               {(vault.status === "settled_revealed" || vault.status === "settled_burned") && (
                 <div
