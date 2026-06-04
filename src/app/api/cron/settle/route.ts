@@ -15,7 +15,7 @@ const client = new SuiJsonRpcClient({
 // Derive a keypair from the deployer private key stored in env
 function getKeypair(): Ed25519Keypair {
   const raw = process.env.SETTLER_PRIVATE_KEY!;
-  return Ed25519Keypair.fromSecretKey(raw);
+  return Ed25519Keypair.fromSecretKey(Buffer.from(raw, "hex"));
 }
 
 async function fetchAllVaultIds(): Promise<string[]> {
