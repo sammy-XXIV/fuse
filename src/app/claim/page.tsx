@@ -155,14 +155,8 @@ export default function ClaimPage() {
                 className="p-5 rounded-xl mb-6"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
               >
-                <div className="text-sm font-medium mb-3" style={{ color: "var(--walrus)" }}>Vault Details</div>
+                <div className="text-sm font-medium mb-3" style={{ color: "var(--walrus)" }}>Vault Status</div>
                 <div className="space-y-2 text-sm">
-                  {vault.conditionLabel && (
-                    <div className="flex justify-between gap-4">
-                      <span style={{ color: "var(--muted)" }}>Condition</span>
-                      <span className="font-medium text-right">{vault.conditionLabel}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                     <span style={{ color: "var(--muted)" }}>Status</span>
                     <span className="font-medium" style={{ color }}>{text}</span>
