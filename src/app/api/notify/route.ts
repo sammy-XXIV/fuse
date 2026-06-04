@@ -17,7 +17,7 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Fuse <onboarding@resend.dev>",
+      from: "Fuse <noreply@fusevault.xyz>",
       to: [to],
       subject: "Someone secured files for you — Fuse",
       html: `
