@@ -2,10 +2,7 @@ import twilio from "twilio/lib/rest/Twilio";
 import { NextRequest, NextResponse } from "next/server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-const MJ_AUTH = Buffer.from(
-  `${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`
-).toString("base64");
+const RESEND_API_KEY = process.env.RESEND_API_KEY!;
 
 const twilioClient = new twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -13,19 +10,17 @@ const twilioClient = new twilio(
 );
 
 async function sendEmail(to: string, claimUrl: string, personalMessage?: string) {
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${MJ_AUTH}`,
+      Authorization: `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      Messages: [
-        {
-          From: { Email: "samsonsamuel531@gmail.com", Name: "Fuse" },
-          To: [{ Email: to }],
-          Subject: "Someone secured files for you — Fuse",
-          HTMLContent: `
+      from: "Fuse <onboarding@resend.dev>",
+      to: [to],
+      subject: "Someone secured files for you — Fuse",
+      html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
@@ -87,14 +82,12 @@ async function sendEmail(to: string, claimUrl: string, personalMessage?: string)
   </table>
 </body>
 </html>`,
-        },
-      ],
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Mailjet error: ${err}`);
+    throw new Error(`Resend error: ${err}`);
   }
 }
 
