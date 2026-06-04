@@ -4,7 +4,8 @@ import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-ki
 import ConditionParser from "@/components/ConditionParser";
 import { encryptFiles } from "@/lib/crypto";
 import { uploadToWalrus } from "@/lib/walrus";
-import { buildCreateVaultTx, COND, RULE } from "@/lib/contract";
+import { buildCreateVaultTx, COND, RULE, PACKAGE_ID, MODULE } from "@/lib/contract";
+import { suiClient } from "@/lib/tatum";
 
 type VaultRule = "reveal" | "burn";
 
@@ -125,11 +126,19 @@ export default function CreateVault() {
       });
 
       setStatus("signing");
-      const result = await signAndExecute({ transaction: tx });
+      await signAndExecute({ transaction: tx });
 
-      const created = (result as { effects?: { created?: { reference?: { objectId: string } }[] } })
-        ?.effects?.created;
-      const newVaultId = created?.[0]?.reference?.objectId ?? "";
+      // Query the most recent VaultCreated event by this owner to get the vault ID
+      await new Promise(r => setTimeout(r, 2000)); // wait for indexer
+      const events = await suiClient.queryEvents({
+        query: { MoveEventType: `${PACKAGE_ID}::${MODULE}::VaultCreated` },
+        limit: 10,
+        order: "descending",
+      });
+      const myEvent = events.data.find(
+        e => (e.parsedJson as { owner: string })?.owner === account.address
+      );
+      const newVaultId = (myEvent?.parsedJson as { vault_id: string })?.vault_id ?? "";
       setVaultId(newVaultId);
 
       const claimUrl = `${window.location.origin}/claim?vault=${newVaultId}#${keyB64}`;
