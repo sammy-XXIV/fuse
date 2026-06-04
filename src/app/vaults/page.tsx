@@ -48,9 +48,11 @@ function mapRawVault(raw: Record<string, unknown>): VaultUI {
 
   const deadlineMs = condType === 1 ? fireDateMs : lastCheckin + intervalMs;
 
+  const condLabels: Record<number, string> = { 0: "Ping Timeout", 1: "Date Lock", 2: "Guardian Confirm", 3: "Wallet Trigger", 4: "Combined" };
+
   return {
     id: raw.id as string,
-    label: (raw.condition_label as string) || "Vault",
+    label: condLabels[condType] || "Vault",
     heirContact: (raw.heir_contact as string) || (raw.heir as string) || "—",
     delivery: (raw.delivery_method as string) || "wallet",
     rule: rule === 1 ? "burn" : "reveal",
@@ -282,7 +284,7 @@ export default function MyVaults() {
             <div className="flex items-start justify-between mb-5">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-lg font-semibold truncate max-w-xs">{vault.conditionLabel || vault.label}</h3>
+                  <h3 className="text-lg font-semibold truncate max-w-xs">{vault.label || "Vault"}</h3>
                   <StatusBadge status={vault.status} />
                 </div>
                 <div className="text-xs font-mono mt-1" style={{ color: "var(--muted)" }}>{vault.id.slice(0, 20)}…</div>
@@ -325,11 +327,15 @@ export default function MyVaults() {
                   ⚠️ Vault is Dormant — Revive
                 </button>
               )}
-              <a
-                href={`https://suiscan.xyz/testnet/object/${vault.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              {(vault.status === "settled_revealed" || vault.status === "settled_burned") && (
+                <div
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold"
+                  style={{ padding: "12px", background: vault.status === "settled_revealed" ? "rgba(120,240,212,0.08)" : "rgba(239,68,68,0.08)", color: vault.status === "settled_revealed" ? "var(--walrus)" : "#ef4444", border: `1px solid ${vault.status === "settled_revealed" ? "rgba(120,240,212,0.2)" : "rgba(239,68,68,0.2)"}` }}
+                >
+                  {vault.status === "settled_revealed" ? "📬 Files Delivered" : "🔥 Files Burned"}
+                </div>
+              )}
+              <a href={`https://suiscan.xyz/testnet/object/${vault.id}`} target="_blank" rel="noopener noreferrer">
                 <button className="btn-ghost" style={{ padding: "12px 20px" }}>View on Explorer</button>
               </a>
             </div>
