@@ -18,7 +18,7 @@ function conditionToArgs(condition: Record<string, unknown>, guardianAddrs: stri
   const base = {
     conditionType: COND.PING,
     intervalMs: 30 * 24 * 60 * 60 * 1000,
-    gracePeriodMs: 7 * 24 * 60 * 60 * 1000,
+    gracePeriodMs: 0,
     fireDateMs: 0,
     triggerWallet: null as string | null,
     guardians: [] as string[],

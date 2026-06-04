@@ -334,24 +334,14 @@ export default function MyVaults() {
                 </button>
               )}
               {vault.status === "dormant" && (
-                <>
-                  <button
-                    className="btn-primary flex-1"
-                    style={{ padding: "12px", background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
-                    disabled={checkingIn === vault.id}
-                    onClick={() => handleCheckIn(vault.id)}
-                  >
-                    {checkingIn === vault.id ? "Reviving..." : "⚡ Revive"}
-                  </button>
-                  <button
-                    className="btn-primary flex-1"
-                    style={{ padding: "12px" }}
-                    disabled={settling === vault.id}
-                    onClick={() => handleSettle(vault.id)}
-                  >
-                    {settling === vault.id ? "Settling..." : "📬 Settle Now"}
-                  </button>
-                </>
+                <button
+                  className="btn-primary flex-1"
+                  style={{ padding: "12px", background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
+                  disabled={checkingIn === vault.id}
+                  onClick={() => handleCheckIn(vault.id)}
+                >
+                  {checkingIn === vault.id ? "Reviving..." : "⚡ Revive"}
+                </button>
               )}
               {(vault.status === "settled_revealed" || vault.status === "settled_burned") && (
                 <div
