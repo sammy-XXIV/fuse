@@ -65,7 +65,7 @@ export default function CreateVault() {
   const [heirWallet, setHeirWallet] = useState("");
   const [message, setMessage] = useState("");
   const [condition, setCondition] = useState<Record<string, unknown> | null>(null);
-  const [guardians, setGuardians] = useState<string[]>([""]);
+  const [guardianEmails, setGuardianEmails] = useState<string[]>([""]);
   const [guardianThreshold, setGuardianThreshold] = useState(1);
 
   const [status, setStatus] = useState<"idle" | "encrypting" | "uploading" | "signing" | "done" | "error">("idle");
@@ -101,7 +101,19 @@ export default function CreateVault() {
       setStatus("uploading");
       const { blobId } = await uploadToWalrus(encrypted, 5);
 
-      const condArgs = conditionToArgs(condition, guardians.filter(g => g.trim()), guardianThreshold);
+      // Derive guardian wallet addresses from emails server-side
+      let guardianAddresses: string[] = [];
+      if (condition.type === "GUARDIAN_CONFIRM") {
+        const validEmails = guardianEmails.filter(e => e.includes("@"));
+        const res = await fetch("/api/guardian/addresses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emails: validEmails }),
+        });
+        const data = await res.json();
+        guardianAddresses = data.addresses.map((a: { address: string }) => a.address);
+      }
+      const condArgs = conditionToArgs(condition, guardianAddresses, guardianThreshold);
       const heirAddress = delivery === "wallet" ? heirWallet : ZERO_ADDR;
       const contact = heirContact || heirWallet;
 
@@ -139,6 +151,16 @@ export default function CreateVault() {
             personalMessage: message,
             delivery,
           }),
+        });
+      }
+
+      // Email each guardian their confirm link
+      if (condition.type === "GUARDIAN_CONFIRM") {
+        const validEmails = guardianEmails.filter(e => e.includes("@"));
+        await fetch("/api/guardian/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emails: validEmails, vaultId: newVaultId, appUrl: window.location.origin }),
         });
       }
 
@@ -190,7 +212,7 @@ export default function CreateVault() {
               <button className="btn-primary" style={{ padding: "12px 28px" }}>View My Vaults</button>
             </a>
             <button className="btn-ghost" style={{ padding: "12px 28px" }} onClick={() => {
-              setStatus("idle"); setStep(1); setFiles([]); setCondition(null); setHeirContact(""); setHeirWallet(""); setGuardians([""]); setGuardianThreshold(1);
+              setStatus("idle"); setStep(1); setFiles([]); setCondition(null); setHeirContact(""); setHeirWallet(""); setGuardianEmails([""]); setGuardianThreshold(1);
             }}>
               Create Another
             </button>
@@ -417,28 +439,28 @@ export default function CreateVault() {
                     className="p-5 rounded-xl mb-6"
                     style={{ background: "rgba(120,240,212,0.04)", border: "1px solid rgba(120,240,212,0.15)" }}
                   >
-                    <div className="text-sm font-semibold mb-1" style={{ color: "var(--walrus)" }}>👥 Guardian Wallets</div>
+                    <div className="text-sm font-semibold mb-1" style={{ color: "var(--walrus)" }}>👥 Guardian Emails</div>
                     <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
-                      Enter the Sui wallet addresses of your guardians. They must all confirm before files are released.
+                      Enter your guardians&apos; email addresses. They&apos;ll get a link — no crypto wallet needed.
                     </p>
                     <div className="space-y-2 mb-3">
-                      {guardians.map((g, i) => (
+                      {guardianEmails.map((g, i) => (
                         <div key={i} className="flex gap-2">
                           <input
-                            type="text"
+                            type="email"
                             className="glass-input flex-1"
-                            placeholder={`Guardian ${i + 1} wallet (0x...)`}
+                            placeholder={`Guardian ${i + 1} email`}
                             value={g}
                             onChange={(e) => {
-                              const updated = [...guardians];
+                              const updated = [...guardianEmails];
                               updated[i] = e.target.value;
-                              setGuardians(updated);
+                              setGuardianEmails(updated);
                             }}
                             style={{ fontSize: "12px" }}
                           />
-                          {guardians.length > 1 && (
+                          {guardianEmails.length > 1 && (
                             <button
-                              onClick={() => setGuardians(guardians.filter((_, idx) => idx !== i))}
+                              onClick={() => setGuardianEmails(guardianEmails.filter((_, idx) => idx !== i))}
                               className="text-sm opacity-40 hover:opacity-100 px-2"
                             >✕</button>
                           )}
@@ -446,7 +468,7 @@ export default function CreateVault() {
                       ))}
                     </div>
                     <button
-                      onClick={() => setGuardians([...guardians, ""])}
+                      onClick={() => setGuardianEmails([...guardianEmails, ""])}
                       className="text-xs px-3 py-1.5 rounded-lg mb-4"
                       style={{ background: "rgba(120,240,212,0.08)", color: "var(--walrus)", border: "1px solid rgba(120,240,212,0.15)" }}
                     >+ Add guardian</button>
@@ -459,8 +481,8 @@ export default function CreateVault() {
                         value={guardianThreshold}
                         onChange={(e) => setGuardianThreshold(Number(e.target.value))}
                       >
-                        {guardians.map((_, i) => (
-                          <option key={i + 1} value={i + 1}>{i + 1} of {guardians.length}</option>
+                        {guardianEmails.map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} of {guardianEmails.length}</option>
                         ))}
                       </select>
                     </div>

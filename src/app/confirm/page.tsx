@@ -1,23 +1,19 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useCurrentAccount, useSignAndExecuteTransaction, ConnectButton } from "@mysten/dapp-kit";
 import { fetchVault } from "@/lib/contract";
-import { buildGuardianConfirmTx } from "@/lib/contract";
 
 interface VaultInfo {
   id: string;
   conditionLabel: string;
-  guardians: string[];
   guardianThreshold: number;
   guardianConfirms: number;
   state: number;
 }
 
 export default function ConfirmPage() {
-  const account = useCurrentAccount();
-  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-
   const [vaultId, setVaultId] = useState("");
+  const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
   const [vault, setVault] = useState<VaultInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
@@ -27,19 +23,16 @@ export default function ConfirmPage() {
   const load = useCallback(async (vid: string) => {
     try {
       const raw = await fetchVault(vid) as Record<string, unknown> | null;
-      if (!raw) { setError("Vault not found."); setLoading(false); return; }
-
-      const guardians = (raw.guardians as string[]) ?? [];
+      if (!raw) { setError("Vault not found. Use the exact link from your email."); setLoading(false); return; }
       setVault({
         id: raw.id as string,
         conditionLabel: (raw.condition_label as string) || "Guardian confirmation vault",
-        guardians,
-        guardianThreshold: Number(raw.guardian_threshold ?? guardians.length),
+        guardianThreshold: Number(raw.guardian_threshold ?? 1),
         guardianConfirms: Number(raw.guardian_confirms ?? 0),
         state: Number(raw.state ?? 0),
       });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load vault");
+    } catch {
+      setError("Failed to load vault. Use the exact link from your email.");
     } finally {
       setLoading(false);
     }
@@ -48,30 +41,42 @@ export default function ConfirmPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const vid = params.get("vault") ?? "";
+    const em = params.get("email") ?? "";
+    const tok = params.get("token") ?? "";
+
     setVaultId(vid);
-    if (!vid) { setError("No vault ID in URL."); setLoading(false); return; }
+    setEmail(em);
+    setToken(tok);
+
+    if (!vid || !vid.startsWith("0x")) {
+      setError("Invalid vault link. Use the exact link from your email.");
+      setLoading(false);
+      return;
+    }
     load(vid);
   }, [load]);
 
   async function handleConfirm() {
-    if (!vault || !account) return;
     setConfirming(true);
+    setError("");
     try {
-      const tx = buildGuardianConfirmTx(vault.id);
-      await signAndExecute({ transaction: tx });
+      const res = await fetch("/api/guardian/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, vaultId, token }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Confirmation failed");
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Transaction failed");
+      setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setConfirming(false);
     }
   }
 
-  const isGuardian = vault && account
-    ? vault.guardians.map(g => g.toLowerCase()).includes(account.address.toLowerCase())
-    : false;
-
   const alreadySettled = vault && vault.state >= 2;
+  const hasToken = !!token && !!email;
   const W = "rgba(120,240,212,";
 
   return (
@@ -90,19 +95,18 @@ export default function ConfirmPage() {
 
         {loading && (
           <div className="text-center py-10" style={{ color: "var(--muted)" }}>
-            <div className="text-3xl mb-4" style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</div>
             <p>Loading vault...</p>
           </div>
         )}
 
-        {!loading && error && (
+        {!loading && error && !done && (
           <div className="text-center py-10">
             <div className="text-4xl mb-4">⚠️</div>
             <p className="text-sm" style={{ color: "#f87171" }}>{error}</p>
           </div>
         )}
 
-        {!loading && !error && vault && (
+        {!loading && vault && (
           <div>
             {/* Vault info */}
             <div
@@ -111,10 +115,6 @@ export default function ConfirmPage() {
             >
               <div className="text-xs font-semibold mb-3" style={{ color: "var(--walrus)" }}>Vault Details</div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span style={{ color: "var(--muted)" }}>Condition</span>
-                  <span className="font-medium text-right max-w-[200px]">{vault.conditionLabel}</span>
-                </div>
                 <div className="flex justify-between">
                   <span style={{ color: "var(--muted)" }}>Confirmations</span>
                   <span className="font-medium" style={{ color: "var(--walrus)" }}>
@@ -127,9 +127,14 @@ export default function ConfirmPage() {
                     {alreadySettled ? "Settled" : "Awaiting confirmations"}
                   </span>
                 </div>
+                {email && (
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--muted)" }}>Confirming as</span>
+                    <span className="font-medium">{email}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Progress bar */}
               <div className="mt-4 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
@@ -149,7 +154,7 @@ export default function ConfirmPage() {
                 <div className="text-3xl mb-3">✅</div>
                 <div className="font-semibold mb-1" style={{ color: "var(--walrus)" }}>Confirmed</div>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Your confirmation has been recorded on-chain. Once the threshold is reached, files will be delivered automatically.
+                  Your confirmation is recorded on-chain. Once the threshold is reached, files will be delivered automatically.
                 </p>
               </div>
             ) : alreadySettled ? (
@@ -159,19 +164,12 @@ export default function ConfirmPage() {
               >
                 This vault has already settled — files have been delivered.
               </div>
-            ) : !account ? (
-              <div className="text-center">
-                <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
-                  Connect your wallet to confirm you can&apos;t reach the vault owner.
-                </p>
-                <ConnectButton />
-              </div>
-            ) : !isGuardian ? (
+            ) : !hasToken ? (
               <div
                 className="p-4 rounded-xl text-sm text-center"
                 style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}
               >
-                Your wallet ({account.address.slice(0, 10)}…) is not listed as a guardian for this vault.
+                This link is incomplete. Use the exact link from the email you received.
               </div>
             ) : (
               <div>
@@ -179,24 +177,19 @@ export default function ConfirmPage() {
                   className="p-4 rounded-xl mb-5 text-sm"
                   style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}
                 >
-                  ⚠️ By confirming, you are declaring that you cannot reach the vault owner and believe files should be delivered. This action is permanent and recorded on-chain.
+                  ⚠️ By confirming, you are declaring that you cannot reach the vault owner. This action is permanent and recorded on-chain.
                 </div>
+                {error && (
+                  <p className="text-sm mb-4 text-center" style={{ color: "#f87171" }}>{error}</p>
+                )}
                 <button
                   className="btn-primary w-full"
                   style={{ padding: "14px" }}
                   disabled={confirming}
                   onClick={handleConfirm}
                 >
-                  {confirming ? "Signing..." : "✅ Confirm I can't reach them"}
+                  {confirming ? "Submitting..." : "✅ Confirm I can't reach them"}
                 </button>
-              </div>
-            )}
-
-            {account && isGuardian && !done && !alreadySettled && (
-              <div className="mt-4 text-center">
-                <span className="text-xs px-3 py-1 rounded-full" style={{ background: `${W}0.08)`, color: "var(--walrus)" }}>
-                  ✓ Wallet verified as guardian
-                </span>
               </div>
             )}
           </div>
