@@ -74,11 +74,15 @@ export async function GET(req: NextRequest) {
       try {
         const info = await getVaultState(id);
         if (!info) continue;
-        if (info.state !== 0) continue; // already dormant or settled
-        if (now < info.deadlineMs) continue; // deadline not passed
+        if (info.state >= 2) continue; // already settled, skip
 
-        // Mark dormant then settle
-        await callTx("mark_dormant", id);
+        if (info.state === 0) {
+          // Alive — check if deadline passed, then mark dormant
+          if (now < info.deadlineMs) continue;
+          await callTx("mark_dormant", id);
+        }
+
+        // State is now 1 (dormant) — settle it
         await callTx("settle", id);
         settled.push(id);
       } catch (e) {
