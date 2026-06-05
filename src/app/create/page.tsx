@@ -352,7 +352,7 @@ export default function CreateVault() {
             >+ Add recipient</button>
 
             {/* Threshold — only meaningful for 2+ recipients */}
-            {recipients.filter(r => r.includes("@")).length > 1 && (
+            {validRecipients.length > 1 && (
               <div className="flex items-center gap-3 mb-6 p-4 rounded-xl" style={{ background: `${W}0.04)`, border: `1px solid ${W}0.12)` }}>
                 <span className="text-sm" style={{ color: "var(--muted)" }}>Approvals needed to release:</span>
                 <select
@@ -361,8 +361,8 @@ export default function CreateVault() {
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value))}
                 >
-                  {recipients.filter(r => r.includes("@")).map((_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1} of {recipients.filter(r => r.includes("@")).length}</option>
+                  {validRecipients.map((_, i) => (
+                    <option key={i + 1} value={i + 1}>{i + 1} of {validRecipients.length}</option>
                   ))}
                 </select>
               </div>
