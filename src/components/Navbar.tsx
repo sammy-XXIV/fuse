@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react";
 
 function WalletMenu() {
   const account = useCurrentAccount();
-  const { mutate: disconnect } = useDisconnectWallet();
+  const { mutateAsync: disconnect } = useDisconnectWallet();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -75,7 +75,7 @@ function WalletMenu() {
           </button>
           <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 12px" }} />
           <button
-            onClick={() => { disconnect(); setOpen(false); }}
+            onClick={async () => { setOpen(false); await disconnect(); window.location.reload(); }}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left"
             style={{ color: "#f87171" }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
