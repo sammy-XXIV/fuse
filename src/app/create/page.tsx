@@ -88,7 +88,10 @@ export default function CreateVault() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const validRecipients = recipients.filter(r => r.includes("@"));
+  const isSuiAddress = (s: string) => /^0x[0-9a-fA-F]{64}$/.test(s.trim());
+  const validRecipients = recipients.filter(r => r.trim() && (r.includes("@") || isSuiAddress(r)));
+  const emailRecipients = validRecipients.filter(r => r.includes("@"));
+  const walletRecipients = validRecipients.filter(r => isSuiAddress(r));
 
   async function handleLightFuse() {
     if (!account) { setErrorMsg("Connect your wallet first."); setStatus("error"); return; }
@@ -102,22 +105,22 @@ export default function CreateVault() {
       const { blobId } = await uploadToWalrus(encrypted, 5);
 
       // For GUARDIAN_CONFIRM: recipients are the guardians
-      // Derive wallet addresses from their emails server-side
-      let guardianAddresses: string[] = [];
-      if (condition.type === "GUARDIAN_CONFIRM") {
+      // Wallet addresses go directly; emails are converted to derived addresses server-side
+      let guardianAddresses: string[] = [...walletRecipients.map(r => r.trim())];
+      if (condition.type === "GUARDIAN_CONFIRM" && emailRecipients.length > 0) {
         const res = await fetch("/api/guardian/addresses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ emails: validRecipients }),
+          body: JSON.stringify({ emails: emailRecipients }),
         });
         const data = await res.json();
-        guardianAddresses = data.addresses.map((a: { address: string }) => a.address);
+        guardianAddresses = [...guardianAddresses, ...data.addresses.map((a: { address: string }) => a.address)];
       }
 
       const condArgs = conditionToArgs(condition, guardianAddresses, threshold);
       const tx = buildCreateVaultTx({
         blobId,
-        heir: account.address, // contract needs valid address; actual delivery is via email
+        heir: account.address,
         deliveryMethod: "gmail",
         heirContact: validRecipients.join(","),
         conditionLabel: condition.human_readable as string,
@@ -144,21 +147,23 @@ export default function CreateVault() {
       const claimUrl = `${window.location.origin}/claim?vault=${newVaultId}#${keyB64}`;
 
       if (condition.type === "GUARDIAN_CONFIRM") {
-        // Email all recipients as guardians — they vote to release files
-        await fetch("/api/guardian/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            emails: validRecipients,
-            vaultId: newVaultId,
-            appUrl: window.location.origin,
-            claimUrl,
-            personalMessage: message,
-          }),
-        });
+        // Email guardian recipients their confirm link; wallet recipients confirm via /confirm page
+        if (emailRecipients.length > 0) {
+          await fetch("/api/guardian/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              emails: emailRecipients,
+              vaultId: newVaultId,
+              appUrl: window.location.origin,
+              claimUrl,
+              personalMessage: message,
+            }),
+          });
+        }
       } else {
-        // Email all recipients as notification
-        await Promise.all(validRecipients.map(email =>
+        // Email all email recipients the claim link
+        await Promise.all(emailRecipients.map(email =>
           fetch("/api/notify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -180,6 +185,9 @@ export default function CreateVault() {
     }
   }
 
+  const confirmUrl = vaultId ? `${typeof window !== "undefined" ? window.location.origin : ""}/confirm?vault=${vaultId}` : "";
+  const hasWalletGuardians = condition?.type === "GUARDIAN_CONFIRM" && walletRecipients.length > 0;
+
   if (status === "done") {
     return (
       <div className="max-w-2xl mx-auto px-6 py-12 text-center">
@@ -189,8 +197,28 @@ export default function CreateVault() {
           <p className="mb-6" style={{ color: "var(--muted)" }}>
             Your files are encrypted on Walrus and the vault is live on Sui testnet.
           </p>
-          {vaultId && (
+          {hasWalletGuardians && vaultId && (
             <div className="p-4 rounded-xl mb-6 text-left" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.2)` }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--walrus)" }}>👛 Share with wallet guardians</div>
+              <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
+                Send this link to the {walletRecipients.length} wallet guardian{walletRecipients.length > 1 ? "s" : ""} so they can vote:
+              </p>
+              <div className="flex gap-2 items-center">
+                <div className="text-xs font-mono break-all flex-1 p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.3)" }}>
+                  {confirmUrl}
+                </div>
+                <button
+                  className="btn-ghost shrink-0"
+                  style={{ padding: "8px 14px", fontSize: "12px" }}
+                  onClick={() => navigator.clipboard.writeText(confirmUrl)}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+          {vaultId && (
+            <div className="p-4 rounded-xl mb-6 text-left" style={{ background: `${W}0.04)`, border: `1px solid ${W}0.12)` }}>
               <div className="text-xs font-semibold mb-1" style={{ color: "var(--walrus)" }}>Vault ID</div>
               <div className="text-xs font-mono break-all" style={{ color: "var(--muted)" }}>{vaultId}</div>
             </div>
@@ -292,9 +320,9 @@ export default function CreateVault() {
               {recipients.map((r, i) => (
                 <div key={i} className="flex gap-2 items-center">
                   <input
-                    type="email"
+                    type="text"
                     className="glass-input flex-1"
-                    placeholder={`Recipient ${i + 1} email`}
+                    placeholder={`Recipient ${i + 1} email or wallet address`}
                     value={r}
                     onChange={(e) => {
                       const updated = [...recipients];
