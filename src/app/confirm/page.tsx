@@ -109,12 +109,12 @@ export default function ConfirmPage() {
   return (
     <div className="max-w-lg mx-auto px-6 pt-20 pb-16">
       <div className="text-center mb-10">
-        <div className="text-5xl mb-5">👥</div>
+        <div className="text-5xl mb-5">📬</div>
         <h1 className="text-4xl font-bold mb-3">
-          Guardian <span style={{ color: "var(--walrus)" }}>Confirm</span>
+          Release <span style={{ color: "var(--walrus)" }}>Files</span>
         </h1>
         <p style={{ color: "var(--muted)" }}>
-          Confirm that the vault owner is unreachable to trigger file delivery.
+          Vote to release the files. Once enough votes are cast, delivery is automatic.
         </p>
       </div>
 
@@ -171,7 +171,7 @@ export default function ConfirmPage() {
                 <div className="text-3xl mb-3">✅</div>
                 <div className="font-semibold mb-1" style={{ color: "var(--walrus)" }}>Confirmed</div>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Your confirmation is recorded on-chain. Once the threshold is reached, files will be delivered automatically.
+                  Your vote is recorded on-chain. Once enough votes are cast, files will be delivered automatically.
                 </p>
               </div>
             ) : alreadySettled ? (
@@ -191,7 +191,7 @@ export default function ConfirmPage() {
                 </div>
 
                 <div className="p-4 rounded-xl mb-5 text-sm" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}>
-                  ⚠️ By confirming, you are declaring that you cannot reach the vault owner. This is permanent and recorded on-chain.
+                  ⚠️ Your vote is permanent and recorded on-chain. Once the threshold is reached, files are delivered automatically.
                 </div>
 
                 {mode === "email" ? (
@@ -202,7 +202,7 @@ export default function ConfirmPage() {
                       </p>
                       {error && <p className="text-sm mb-3 text-center" style={{ color: "#f87171" }}>{error}</p>}
                       <button className="btn-primary w-full" style={{ padding: "14px" }} disabled={confirming} onClick={handleEmailConfirm}>
-                        {confirming ? "Submitting..." : "✅ Confirm I can't reach them"}
+                        {confirming ? "Submitting..." : "✅ Vote to release files"}
                       </button>
                     </div>
                   ) : (
@@ -224,7 +224,7 @@ export default function ConfirmPage() {
                     <div>
                       {error && <p className="text-sm mb-3 text-center" style={{ color: "#f87171" }}>{error}</p>}
                       <button className="btn-primary w-full" style={{ padding: "14px" }} disabled={confirming} onClick={handleWalletConfirm}>
-                        {confirming ? "Signing..." : "✅ Confirm I can't reach them"}
+                        {confirming ? "Signing..." : "✅ Vote to release files"}
                       </button>
                       <p className="text-xs mt-3 text-center" style={{ color: "var(--walrus)" }}>✓ Wallet verified as guardian</p>
                     </div>
