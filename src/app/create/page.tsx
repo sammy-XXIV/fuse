@@ -146,13 +146,13 @@ export default function CreateVault() {
 
       const claimUrl = `${window.location.origin}/claim?vault=${newVaultId}#${keyB64}`;
 
-      // Store claim URL server-side so cron can email it to subscribers after settlement
+      // Store claim URL so cron can email it to subscribers after settlement
       if (newVaultId) {
-        await fetch("/api/vault/register", {
+        fetch("/api/vault/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ vaultId: newVaultId, claimUrl }),
-        });
+        }).catch(() => {});
       }
 
       if (condition.type === "GUARDIAN_CONFIRM") {
@@ -194,6 +194,7 @@ export default function CreateVault() {
     }
   }
 
+  const [copiedConfirm, setCopiedConfirm] = useState(false);
   const confirmUrl = vaultId ? `${typeof window !== "undefined" ? window.location.origin : ""}/confirm?vault=${vaultId}` : "";
   const hasWalletGuardians = condition?.type === "GUARDIAN_CONFIRM" && walletRecipients.length > 0;
 
@@ -206,32 +207,23 @@ export default function CreateVault() {
           <p className="mb-6" style={{ color: "var(--muted)" }}>
             Your files are encrypted on Walrus and the vault is live on Sui testnet.
           </p>
+
           {hasWalletGuardians && vaultId && (
-            <div className="p-4 rounded-xl mb-6 text-left" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.2)` }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: "var(--walrus)" }}>👛 Share with wallet guardians</div>
+            <div className="p-5 rounded-xl mb-5 text-left" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.2)` }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: "var(--walrus)" }}>👛 Send this vote link to your wallet guardians</div>
               <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-                Send this link to the {walletRecipients.length} wallet guardian{walletRecipients.length > 1 ? "s" : ""} so they can vote:
+                They vote to release the files. Once the threshold is reached, they&apos;ll be emailed the download link automatically.
               </p>
               <div className="flex gap-2 items-center">
-                <div className="text-xs font-mono break-all flex-1 p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.3)" }}>
-                  {confirmUrl}
-                </div>
-                <button
-                  className="btn-ghost shrink-0"
-                  style={{ padding: "8px 14px", fontSize: "12px" }}
-                  onClick={() => navigator.clipboard.writeText(confirmUrl)}
-                >
-                  Copy
+                <div className="text-xs font-mono break-all flex-1 p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.3)" }}>{confirmUrl}</div>
+                <button className="btn-ghost shrink-0" style={{ padding: "8px 14px", fontSize: "12px" }}
+                  onClick={() => { navigator.clipboard.writeText(confirmUrl); setCopiedConfirm(true); setTimeout(() => setCopiedConfirm(false), 2000); }}>
+                  {copiedConfirm ? "✓" : "Copy"}
                 </button>
               </div>
             </div>
           )}
-          {vaultId && (
-            <div className="p-4 rounded-xl mb-6 text-left" style={{ background: `${W}0.04)`, border: `1px solid ${W}0.12)` }}>
-              <div className="text-xs font-semibold mb-1" style={{ color: "var(--walrus)" }}>Vault ID</div>
-              <div className="text-xs font-mono break-all" style={{ color: "var(--muted)" }}>{vaultId}</div>
-            </div>
-          )}
+
           <div className="flex gap-4 justify-center">
             <a href="/vaults"><button className="btn-primary" style={{ padding: "12px 28px" }}>View My Vaults</button></a>
             <button className="btn-ghost" style={{ padding: "12px 28px" }} onClick={() => {

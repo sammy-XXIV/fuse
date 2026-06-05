@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SuiJsonRpcClient, JsonRpcHTTPTransport } from "@mysten/sui/jsonRpc";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { kv } from "@vercel/kv";
+import { getClaimUrl, getSubscribers } from "@/lib/gist-store";
 
 const PACKAGE_ID = process.env.NEXT_PUBLIC_PACKAGE_ID!;
 const MODULE = "fuse";
@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
 
         // Email any subscribers who registered on the confirm page
         try {
-          const claimUrl = await kv.get<string>(`claim:${id}`);
-          const subscribers = await kv.smembers<string[]>(`subscribers:${id}`);
+          const claimUrl = await getClaimUrl(id);
+          const subscribers = await getSubscribers(id);
           if (claimUrl && subscribers.length > 0) {
             const RESEND_API_KEY = process.env.RESEND_API_KEY!;
             await Promise.all(subscribers.map(email =>
