@@ -51,11 +51,16 @@ export default function ClaimPage() {
       const raw = await fetchVault(vid) as Record<string, unknown> | null;
       if (!raw) { setStep("not_found"); return; }
 
+      const condType = Number(raw.condition_type ?? 0);
+      const lastCheckin = Number(raw.last_checkin_ms ?? 0);
+      const intervalMs = Number(raw.interval_ms ?? 0);
+      const fireDateMs = Number(raw.fire_date_ms ?? 0);
       setVault({
         blobId: raw.blob_id as string,
         heirContact: raw.heir_contact as string,
         conditionLabel: raw.condition_label as string,
         state: Number(raw.state ?? 0),
+        deadlineMs: condType === 1 ? fireDateMs : lastCheckin + intervalMs,
       });
       setStep("ready");
     } catch (e) {
