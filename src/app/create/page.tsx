@@ -146,6 +146,15 @@ export default function CreateVault() {
 
       const claimUrl = `${window.location.origin}/claim?vault=${newVaultId}#${keyB64}`;
 
+      // Store claim URL server-side so cron can email it to subscribers after settlement
+      if (newVaultId) {
+        await fetch("/api/vault/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vaultId: newVaultId, claimUrl }),
+        });
+      }
+
       if (condition.type === "GUARDIAN_CONFIRM") {
         // Email guardian recipients their confirm link; wallet recipients confirm via /confirm page
         if (emailRecipients.length > 0) {

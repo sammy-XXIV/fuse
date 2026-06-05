@@ -17,6 +17,7 @@ interface VaultInfo {
   heirContact: string;
   conditionLabel: string;
   state: number;
+  deadlineMs: number;
 }
 
 function downloadFile(file: DecryptedFile) {
@@ -43,6 +44,7 @@ export default function ClaimPage() {
   const [files, setFiles] = useState<DecryptedFile[]>([]);
   const [error, setError] = useState("");
   const [keyB64, setKeyB64] = useState("");
+  const [settling, setSettling] = useState(false);
 
   const load = useCallback(async (vid: string) => {
     try {

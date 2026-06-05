@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SuiJsonRpcClient, JsonRpcHTTPTransport } from "@mysten/sui/jsonRpc";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { kv } from "@vercel/kv";
 
 const PACKAGE_ID = process.env.NEXT_PUBLIC_PACKAGE_ID!;
 const MODULE = "fuse";
@@ -85,6 +86,34 @@ export async function GET(req: NextRequest) {
         // State is now 1 (dormant) — settle it
         await callTx("settle", id);
         settled.push(id);
+
+        // Email any subscribers who registered on the confirm page
+        try {
+          const claimUrl = await kv.get<string>(`claim:${id}`);
+          const subscribers = await kv.smembers<string[]>(`subscribers:${id}`);
+          if (claimUrl && subscribers.length > 0) {
+            const RESEND_API_KEY = process.env.RESEND_API_KEY!;
+            await Promise.all(subscribers.map(email =>
+              fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  from: "Fuse <noreply@fusevault.xyz>",
+                  to: [email],
+                  subject: "Your files are ready — Fuse",
+                  html: `<div style="font-family:sans-serif;background:#070D1B;color:#F8FAFF;padding:40px;border-radius:16px;">
+                    <h2 style="color:#78F0D4;">⚡ Files are ready</h2>
+                    <p>The vault has settled. Click below to access your files.</p>
+                    <a href="${claimUrl}" style="display:inline-block;background:#78F0D4;color:#060D1A;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;margin:16px 0;">Access My Files →</a>
+                    <p style="font-size:12px;color:#4A5B7A;word-break:break-all;">${claimUrl}</p>
+                  </div>`,
+                }),
+              })
+            ));
+          }
+        } catch (emailErr) {
+          errors.push(`${id} email: ${emailErr instanceof Error ? emailErr.message : String(emailErr)}`);
+        }
       } catch (e) {
         errors.push(`${id}: ${e instanceof Error ? e.message : String(e)}`);
       }

@@ -25,6 +25,9 @@ export default function ConfirmPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"email" | "wallet">("email");
+  const [deliveryEmail, setDeliveryEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   const load = useCallback(async (vid: string) => {
     try {
@@ -169,10 +172,40 @@ export default function ConfirmPage() {
             {done ? (
               <div className="p-5 rounded-xl text-center" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.25)` }}>
                 <div className="text-3xl mb-3">✅</div>
-                <div className="font-semibold mb-1" style={{ color: "var(--walrus)" }}>Confirmed</div>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Your vote is recorded on-chain. Once enough votes are cast, files will be delivered automatically.
+                <div className="font-semibold mb-1" style={{ color: "var(--walrus)" }}>Vote recorded</div>
+                <p className="text-sm mb-5" style={{ color: "var(--muted)" }}>
+                  Once enough votes are cast, files will be delivered. Enter your email below to get the download link automatically.
                 </p>
+                {subscribed ? (
+                  <div className="text-sm" style={{ color: "var(--walrus)" }}>📧 You&apos;ll receive the files at {deliveryEmail}</div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      className="glass-input flex-1"
+                      placeholder="your@email.com"
+                      value={deliveryEmail}
+                      onChange={e => setDeliveryEmail(e.target.value)}
+                    />
+                    <button
+                      className="btn-primary shrink-0"
+                      style={{ padding: "10px 18px", fontSize: "13px" }}
+                      disabled={subscribing || !deliveryEmail.includes("@")}
+                      onClick={async () => {
+                        setSubscribing(true);
+                        await fetch("/api/guardian/subscribe", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ vaultId, email: deliveryEmail }),
+                        });
+                        setSubscribed(true);
+                        setSubscribing(false);
+                      }}
+                    >
+                      {subscribing ? "..." : "Notify me"}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : alreadySettled ? (
               <div className="p-4 rounded-xl text-sm text-center" style={{ background: `${W}0.06)`, border: `1px solid ${W}0.2)`, color: "var(--walrus)" }}>
