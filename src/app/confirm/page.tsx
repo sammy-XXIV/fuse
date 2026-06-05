@@ -118,7 +118,7 @@ export default function ConfirmPage() {
   const W = "rgba(120,240,212,";
 
   return (
-    <div className="max-w-lg mx-auto px-6 pt-20 pb-16">
+    <div className="max-w-lg mx-auto px-4 md:px-6 pt-16 md:pt-20 pb-16">
       <div className="text-center mb-10">
         <div className="text-5xl mb-5">📬</div>
         <h1 className="text-4xl font-bold mb-3">
@@ -129,7 +129,7 @@ export default function ConfirmPage() {
         </p>
       </div>
 
-      <div className="glass-card p-8">
+      <div className="glass-card p-4 md:p-8">
 
         {loading && (
           <div className="text-center py-10" style={{ color: "var(--muted)" }}>

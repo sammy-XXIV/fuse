@@ -206,14 +206,13 @@ export default function MyVaults() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6" style={{ paddingTop: "80px", paddingBottom: "48px" }}>
-      <a href="/create" style={{ position: "fixed", top: "24px", right: "24px", zIndex: 50 }}>
-        <button className="btn-primary" style={{ padding: "10px 22px", fontSize: "14px" }}>+ New Vault</button>
-      </a>
-
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-bold mb-2">My <span style={{ color: "var(--walrus)" }}>Vaults</span></h1>
-        <p style={{ color: "var(--muted)" }}>Check in to hold delivery.</p>
+    <div className="max-w-4xl mx-auto px-4 md:px-6" style={{ paddingTop: "80px", paddingBottom: "48px" }}>
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl md:text-4xl font-bold mb-2">My <span style={{ color: "var(--walrus)" }}>Vaults</span></h1>
+        <p className="mb-4" style={{ color: "var(--muted)" }}>Check in to hold delivery.</p>
+        <a href="/create">
+          <button className="btn-primary" style={{ padding: "10px 22px", fontSize: "14px" }}>+ New Vault</button>
+        </a>
       </div>
 
       {/* Notification permission banner */}
@@ -294,23 +293,21 @@ export default function MyVaults() {
       <div className="space-y-5">
         {vaults.map((vault, i) => (
           <ScrollReveal key={vault.id} delay={i * 80}>
-          <div className="glass-card p-7">
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-lg font-semibold truncate max-w-xs">{vault.label || "Vault"}</h3>
+          <div className="glass-card p-4 md:p-7">
+            <div className="flex items-start justify-between mb-4 md:mb-5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="text-base md:text-lg font-semibold truncate">{vault.label || "Vault"}</h3>
                   <StatusBadge status={vault.status} />
                 </div>
-                <div className="text-xs font-mono mt-1" style={{ color: "var(--muted)" }}>{vault.id.slice(0, 20)}…</div>
-                <div className="text-sm mt-1" style={{ color: "var(--muted)" }}>
-                  <span style={{ color: vault.rule === "reveal" ? "var(--walrus)" : "#ef4444" }}>
-                    {vault.rule === "reveal" ? "📬 Reveal on settle" : "🔥 Burn on settle"}
-                  </span>
+                <div className="text-xs font-mono mt-1" style={{ color: "var(--muted)" }}>{vault.id.slice(0, 16)}…</div>
+                <div className="text-xs md:text-sm mt-1" style={{ color: vault.rule === "reveal" ? "var(--walrus)" : "#ef4444" }}>
+                  {vault.rule === "reveal" ? "📬 Reveal on settle" : "🔥 Burn on settle"}
                 </div>
               </div>
-              <div className="text-right text-sm shrink-0 ml-4">
+              <div className="text-right text-xs md:text-sm shrink-0 ml-3">
                 <div style={{ color: "var(--muted)" }}>Recipient</div>
-                <div className="font-medium truncate max-w-[160px]">{vault.heirContact}</div>
+                <div className="font-medium truncate max-w-[110px] md:max-w-[160px]">{vault.heirContact}</div>
                 <div className="text-xs" style={{ color: "var(--muted)" }}>via {vault.delivery}</div>
               </div>
             </div>

@@ -237,7 +237,7 @@ export default function CreateVault() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 pt-20 pb-12">
+    <div className="max-w-2xl mx-auto px-4 md:px-6 pt-16 md:pt-20 pb-12">
       <div className="text-center mb-10">
         <h1 className="text-4xl font-bold mb-3">New <span style={{ color: "var(--walrus)" }}>Vault</span></h1>
         <p style={{ color: "var(--muted)" }}>Encrypted before it leaves your device.</p>
@@ -261,7 +261,7 @@ export default function CreateVault() {
         <span style={{ color: step >= 3 ? "var(--walrus)" : undefined }}>Vault Rules</span>
       </div>
 
-      <div className="glass-card p-8">
+      <div className="glass-card p-4 md:p-8">
 
         {/* Step 1: Upload */}
         {step === 1 && (

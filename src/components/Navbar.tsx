@@ -102,7 +102,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className="relative z-50 flex items-center px-6 py-3 mx-4 mt-4 rounded-2xl"
+      className="relative z-50 flex items-center px-3 py-2 mx-3 mt-3 rounded-2xl md:px-6 md:py-3 md:mx-4 md:mt-4"
       style={{
         background: "rgba(8,18,14,0.70)",
         backdropFilter: "blur(24px)",
@@ -112,19 +112,19 @@ export default function Navbar() {
     >
       {/* Logo — left */}
       <Link href="/app" className="flex items-center gap-2 shrink-0">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base font-black" style={{ background: "var(--walrus)", color: "#050F0A" }}>
+        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center text-sm font-black" style={{ background: "var(--walrus)", color: "#050F0A" }}>
           ⚡
         </div>
-        <span className="font-black text-lg tracking-tight" style={{ color: "var(--walrus)" }}>Fuse</span>
+        <span className="font-black text-base md:text-lg tracking-tight" style={{ color: "var(--walrus)" }}>Fuse</span>
       </Link>
 
-      {/* Links — centered */}
-      <div className="flex-1 flex items-center justify-center gap-1">
+      {/* Links — centered, hidden on very small screens */}
+      <div className="flex-1 flex items-center justify-center gap-0.5 md:gap-1">
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200"
+            className="px-2 py-1.5 rounded-xl text-xs md:text-sm md:px-4 md:py-2 font-medium transition-all duration-200"
             style={{
               color: pathname === l.href ? "var(--walrus)" : "var(--muted)",
               background: pathname === l.href ? "rgba(120,240,212,0.08)" : "transparent",
