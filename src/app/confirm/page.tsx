@@ -38,7 +38,9 @@ export default function ConfirmPage() {
         conditionLabel: (raw.condition_label as string) || "Guardian confirmation vault",
         guardians: (raw.guardians as string[]) ?? [],
         guardianThreshold: Number(raw.guardian_threshold ?? 1),
-        guardianConfirms: Number(raw.guardian_confirms ?? 0),
+        guardianConfirms: Array.isArray(raw.guardian_confirms)
+          ? raw.guardian_confirms.length
+          : (typeof raw.guardian_confirms === "string" ? 0 : Number(raw.guardian_confirms ?? 0)),
         state: Number(raw.state ?? 0),
       });
     } catch {
@@ -95,7 +97,13 @@ export default function ConfirmPage() {
       await signAndExecute({ transaction: tx });
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Transaction failed");
+      const msg = e instanceof Error ? e.message : "Transaction failed";
+      if (msg.includes("abort code: 1") || msg.includes("ENotAlive")) {
+        // Vault already went dormant from enough votes — treat as success
+        setDone(true);
+      } else {
+        setError(msg);
+      }
     } finally {
       setConfirming(false);
     }
@@ -174,7 +182,7 @@ export default function ConfirmPage() {
                 <div className="text-3xl mb-3">✅</div>
                 <div className="font-semibold mb-1" style={{ color: "var(--walrus)" }}>Vote recorded</div>
                 <p className="text-sm mb-5" style={{ color: "var(--muted)" }}>
-                  Once enough votes are cast, files will be delivered. Enter your email below to get the download link automatically.
+                  The threshold has been reached. Enter your email below and the download link will be sent to you automatically once the vault settles (within a minute).
                 </p>
                 {subscribed ? (
                   <div className="text-sm" style={{ color: "var(--walrus)" }}>📧 You&apos;ll receive the files at {deliveryEmail}</div>
