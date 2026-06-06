@@ -62,19 +62,7 @@ Add recipients by email or Sui wallet address. Set a threshold (e.g. 2 of 3). Ea
 
 ```bash
 npm install
-cp .env.example .env.local  # fill in your keys
 npm run dev
-```
-
-### Required env vars
-
-```
-NEXT_PUBLIC_SUI_NETWORK=testnet
-NEXT_PUBLIC_CONTRACT_PACKAGE=<your Move package ID>
-GITHUB_TOKEN=<token with gist scope>
-CLAIMS_GIST_ID=<secret gist ID>
-RESEND_API_KEY=<your Resend key>
-CRON_SECRET=<any random string>
 ```
 
 ---
